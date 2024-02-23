@@ -18,7 +18,7 @@
  *    shallowCopy({}) => {}
  */
 function shallowCopy(obj) {
-  const result = { ...obj };
+  const result = {};
   Object.assign(result, obj);
   return result;
 }
@@ -365,34 +365,100 @@ function group(array, keySelector, valueSelector) {
  *
  *  For more examples see unit tests.
  */
+class MySuperBaseElementSelector {
+  constructor(obj, selectors) {
+    Object.assign(this, obj, selectors);
+    this.checkOrder();
+  }
+
+  checkOrder() {
+    let prevWeight = 0;
+    this.selectors.forEach((selector) => {
+      if (selector.weight < prevWeight) {
+        throw new Error(
+          'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element'
+        );
+      }
+      prevWeight = selector.weight;
+    });
+  }
+}
 
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  selectors: [],
+  prevWeight: 0,
+
+  element(value) {
+    this.validateSingleOccurrence('element');
+    const updatedSelector = [
+      ...this.selectors,
+      { type: 'element', value, weight: 1 },
+    ];
+    return new MySuperBaseElementSelector(this, { selectors: updatedSelector });
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    this.validateSingleOccurrence('id');
+    const updatedSelector = [
+      ...this.selectors,
+      { type: 'id', value: `#${value}`, weight: 2 },
+    ];
+    return new MySuperBaseElementSelector(this, { selectors: updatedSelector });
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    const updatedSelector = [
+      ...this.selectors,
+      { type: 'class', value: `.${value}`, weight: 3 },
+    ];
+    return new MySuperBaseElementSelector(this, { selectors: updatedSelector });
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    const updatedSelector = [
+      ...this.selectors,
+      { type: 'attr', value: `[${value}]`, weight: 4 },
+    ];
+    return new MySuperBaseElementSelector(this, { selectors: updatedSelector });
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  pseudoClass(value) {
+    const updatedSelector = [
+      ...this.selectors,
+      { type: 'pseudo-class', value: `:${value}`, weight: 5 },
+    ];
+    return new MySuperBaseElementSelector(this, { selectors: updatedSelector });
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  pseudoElement(value) {
+    this.validateSingleOccurrence('pseudo-element');
+    const updatedSelector = [
+      ...this.selectors,
+      { type: 'pseudo-element', value: `::${value}`, weight: 6 },
+    ];
+    return new MySuperBaseElementSelector(this, { selectors: updatedSelector });
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  validateSingleOccurrence(selectorType) {
+    const existingSelectorTypes = this.selectors.map(
+      (selector) => selector.type
+    );
+    if (existingSelectorTypes.includes(selectorType)) {
+      throw new TypeError(
+        `Element, id and pseudo-element should not occur more then one time inside the selector`
+      );
+    }
+  },
+
+  stringify() {
+    return this.selectors.map((selector) => selector.value).join('');
+  },
+
+  combine(selector1, combinator, selector2) {
+    const s1 = selector1.stringify();
+    const s2 = selector2.stringify();
+    const result = `${s1} ${combinator} ${s2}`;
+    return { stringify: () => result };
   },
 };
 
